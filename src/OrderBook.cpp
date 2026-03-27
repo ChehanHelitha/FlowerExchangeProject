@@ -34,6 +34,7 @@ void OrderBook::processOrder(Order                        order,
 void OrderBook::matchBuy(Order& incoming, std::vector<ExecutionReport>& reports) {
     // Iterate sell book from lowest ask upward (default map order)
     // Stop when no more matchable sell orders remain.
+    bool anyExecutionHappened = false;
     while (incoming.quantity > 0 && !sellBook_.empty()) {
         auto bestSellIt = sellBook_.begin();   // Lowest ask price first
         double bestSellPrice = bestSellIt->first;
@@ -77,6 +78,8 @@ void OrderBook::matchBuy(Order& incoming, std::vector<ExecutionReport>& reports)
             incoming.quantity -= fillQty;
             passive.quantity  -= fillQty;
 
+            anyExecutionHappened = true;
+            
             // Remove fully filled passive order from book
             if (passive.quantity == 0) {
                 priceQueue.pop();
@@ -92,14 +95,17 @@ void OrderBook::matchBuy(Order& incoming, std::vector<ExecutionReport>& reports)
     // If the incoming order still has remaining quantity → add to book
     if (incoming.quantity > 0) {
         // Emit "New" status for the passive resting portion
-        reports.push_back(makeFill(incoming, ExecStatus::New,
-                                    incoming.quantity, incoming.price));
+        if (!anyExecutionHappened) {
+            reports.push_back(makeFill(incoming, ExecStatus::New,
+                                        incoming.quantity, incoming.price));
+        }
         addToBook(std::move(incoming));  // Move the order into the book instead of copying it
     }
 }
 
 void OrderBook::matchSell(Order& incoming, std::vector<ExecutionReport>& reports) {
     // Iterate buy book from highest bid downward (std::greater gives descending)
+    bool anyExecutionHappened = false;
     while (incoming.quantity > 0 && !buyBook_.empty()) {
         auto bestBuyIt = buyBook_.begin();   // Highest bid first
         double bestBuyPrice = bestBuyIt->first;
@@ -135,6 +141,8 @@ void OrderBook::matchSell(Order& incoming, std::vector<ExecutionReport>& reports
             incoming.quantity -= fillQty;
             passive.quantity  -= fillQty;
 
+            anyExecutionHappened = true;
+
             if (passive.quantity == 0) {
                 priceQueue.pop();
             }
@@ -146,8 +154,10 @@ void OrderBook::matchSell(Order& incoming, std::vector<ExecutionReport>& reports
     }
 
     if (incoming.quantity > 0) {
-        reports.push_back(makeFill(incoming, ExecStatus::New,
-                                    incoming.quantity, incoming.price));
+        if (!anyExecutionHappened) {
+            reports.push_back(makeFill(incoming, ExecStatus::New,
+                                        incoming.quantity, incoming.price));
+        }
         addToBook(std::move(incoming));
     }
 }
