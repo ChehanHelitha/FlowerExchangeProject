@@ -31,3 +31,67 @@ Debug/
 
 # Output files
 execution_rep.csv
+
+# CMake generated files (important for your project)
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+install_manifest.txt
+CTestTestfile.cmake
+_deps/
+
+# CLion / JetBrains
+.idea/
+cmake-build-debug/
+cmake-build-release/
+cmake-build-*/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Visual Studio
+.vs/
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+*.suo
+*.user
+*.aps
+*.ncb
+*.opendb
+*.opensdf
+*.sdf
+ipch/
+
+# Xcode (macOS)
+*.xcodeproj/
+*.xcworkspace/
+
+# -------------------------------------------------------
+# OS generated files
+# -------------------------------------------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+
+# Sanitizer & profiling output
+*.profraw
+*.profdata
+vgcore.*
+core.*

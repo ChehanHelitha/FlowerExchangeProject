@@ -1,0 +1,74 @@
+# =============================================================
+# Flower Exchange — Requirements & Toolchain Reference
+# =============================================================
+# This project is a pure C++17 application with NO third-party
+# library dependencies. Everything used (threads, maps, queues,
+# file I/O) is part of the C++ Standard Library.
+#
+# This file documents the BUILD TOOLS required, not Python
+# packages. It exists for CI/CD pipelines and onboarding docs.
+# =============================================================
+
+# -------------------------------------------------------------
+# COMPILER  (one of the following)
+# -------------------------------------------------------------
+# GCC       >= 7.0   (full C++17 + std::optional, std::string_view)
+# Clang     >= 5.0   (full C++17)
+# MSVC      >= 19.14 (Visual Studio 2017 v15.7+, /std:c++17)
+
+# -------------------------------------------------------------
+# BUILD SYSTEM
+# -------------------------------------------------------------
+# CMake     >= 3.14  (for target_compile_options generator exprs)
+
+# -------------------------------------------------------------
+# THREADING LIBRARY
+# -------------------------------------------------------------
+# pthreads  (POSIX — Linux / macOS: built-in with GCC/Clang)
+# (Windows: handled automatically by MSVC runtime)
+
+# -------------------------------------------------------------
+# OPTIONAL — DEVELOPMENT TOOLS
+# -------------------------------------------------------------
+# clang-format  >= 10   (code formatting — see .clang-format)
+# clang-tidy    >= 10   (static analysis)
+# valgrind      >= 3.15  (Linux: memory/thread checking)
+# AddressSanitizer       (built into GCC/Clang — see below)
+
+# -------------------------------------------------------------
+# OPTIONAL — TESTING (if you add unit tests)
+# -------------------------------------------------------------
+# GoogleTest (gtest) >= 1.11
+#   Install: sudo apt install libgtest-dev   (Ubuntu/Debian)
+#            brew install googletest          (macOS)
+#   Or via CMake FetchContent (see CMakeLists.txt comments)
+
+# =============================================================
+# QUICK INSTALL — Ubuntu / Debian
+# =============================================================
+# sudo apt update
+# sudo apt install -y build-essential cmake git
+#
+# QUICK INSTALL — macOS
+# =============================================================
+# brew install cmake gcc
+#
+# QUICK INSTALL — Windows (MSVC)
+# =============================================================
+# Install Visual Studio 2019/2022 with "Desktop development
+# with C++" workload, which includes CMake support.
+#
+# QUICK INSTALL — Windows (MinGW/MSYS2)
+# =============================================================
+# pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake
+
+# =============================================================
+# BUILD WITH SANITIZERS (for debugging/development)
+# =============================================================
+# cmake .. -DCMAKE_BUILD_TYPE=Debug \
+#   -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+# cmake --build .
+#
+# Run with ThreadSanitizer to detect race conditions:
+# cmake .. -DCMAKE_BUILD_TYPE=Debug \
+#   -DCMAKE_CXX_FLAGS="-fsanitize=thread -fno-omit-frame-pointer"

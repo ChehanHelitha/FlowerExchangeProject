@@ -5,7 +5,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Release build: full optimisation + link-time optimisation
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -flto")
+if(MSVC)
+    set(CMAKE_CXX_FLAGS_RELEASE "/O2 /LT")
+else()
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -flto")
+endif()
 
 # Tell CMake where to find our header files
 include_directories(include/Exchange)
