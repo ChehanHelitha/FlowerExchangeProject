@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Flower Exchange — Trader Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  /* ── Design Tokens ──────────────────────────────────────────── */
+  :root {
+    --bg-void:     #080c10;
+    --bg-panel:    #0d1117;
+    --bg-surface:  #111820;
+    --bg-elevated: #161f2b;
+    --border:      #1e2d3d;
+    --border-hi:   #2a3f55;
+    --accent:      #00d4ff;
+    --accent-dim:  rgba(0,212,255,0.12);
+    --accent-glow: rgba(0,212,255,0.35);
+    --green:       #00e5a0;
+    --green-dim:   rgba(0,229,160,0.12);
+    --yellow:      #f5c842;
+    --yellow-dim:  rgba(245,200,66,0.12);
+    --red:         #ff4d6a;
+    --red-dim:     rgba(255,77,106,0.12);
+    --blue:        #4da6ff;
+    --blue-dim:    rgba(77,166,255,0.12);
+    --text-primary:   #e8edf2;
+    --text-secondary: #7a9bb5;
+    --text-muted:     #3d5a72;
+    --font-display: 'Syne', sans-serif;
+    --font-mono:    'Space Mono', monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg-void);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Animated grid background ──────────────────────────────── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.025) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
+  body::after {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background: radial-gradient(ellipse 80% 60% at 50% -10%,
+      rgba(0,212,255,0.07) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  #app { position: relative; z-index: 1; }
+
+  /* ── Scrollbar ──────────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg-panel); }
+  ::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
+
+  /* ── Panel / Card ───────────────────────────────────────────── */
+  .panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    position: relative;
+    overflow: hidden;
+  }
+  .panel::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent-glow), transparent);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+  .panel:hover::before { opacity: 1; }
+
+  .panel-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    background: var(--bg-surface);
+  }
+  .panel-title {
+    font-family: var(--font-display);
+    font-weight: 700; font-size: 11px;
+    letter-spacing: 0.15em; text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+  .panel-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    flex-shrink: 0;
+  }
+
+  /* ── Header ─────────────────────────────────────────────────── */
+  .site-header {
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-panel);
+    padding: 0 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 56px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo {
+    font-family: var(--font-display);
+    font-weight: 800; font-size: 16px;
+    letter-spacing: -0.02em;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-mark {
+    width: 28px; height: 28px;
+    border: 1.5px solid var(--accent);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    box-shadow: 0 0 12px var(--accent-glow), inset 0 0 8px var(--accent-dim);
+    color: var(--accent);
+  }
+  .logo-text { color: var(--text-primary); }
+  .logo-sub { color: var(--accent); }
+
+  .header-status {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; color: var(--text-secondary);
+    letter-spacing: 0.08em;
+  }
+  .status-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+  .status-dot.offline { background: var(--red); box-shadow: 0 0 8px var(--red); animation: none; }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+  }
+
+  .header-meta {
+    display: flex; align-items: center; gap: 24px;
+    font-size: 11px; color: var(--text-muted);
+  }
+  .header-meta span { letter-spacing: 0.06em; }
+  .header-meta strong { color: var(--text-secondary); font-family: var(--font-display); }
+
+  /* ── Drop Zone ──────────────────────────────────────────────── */
+  #drop-zone {
+    border: 1.5px dashed var(--border-hi);
+    border-radius: 4px;
+    padding: 48px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    background: var(--bg-surface);
+    position: relative;
+    overflow: hidden;
+  }
+  #drop-zone::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 60% 40% at 50% 50%,
+      var(--accent-dim) 0%, transparent 70%);
+    opacity: 0; transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  #drop-zone:hover, #drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--bg-elevated);
+  }
+  #drop-zone:hover::before, #drop-zone.drag-over::before { opacity: 1; }
+
+  .drop-icon {
+    width: 48px; height: 48px; margin: 0 auto 16px;
+    border: 1.5px solid var(--border-hi);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    color: var(--text-secondary);
+    transition: all 0.25s;
+    background: var(--bg-elevated);
+  }
+  #drop-zone:hover .drop-icon {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+  .drop-label {
+    font-family: var(--font-display);
+    font-size: 14px; font-weight: 600;
+    color: var(--text-primary); margin-bottom: 6px;
+  }
+  .drop-sub { font-size: 11px; color: var(--text-muted); letter-spacing: 0.06em; }
+
+  /* ── File badge ─────────────────────────────────────────────── */
+  #file-badge {
+    display: none;
+    align-items: center; gap: 10px;
+    padding: 10px 16px;
+    background: var(--green-dim);
+    border: 1px solid rgba(0,229,160,0.25);
+    border-radius: 4px;
+    font-size: 12px; color: var(--green);
+  }
+
+  /* ── Buttons ─────────────────────────────────────────────────── */
+  .btn {
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 10px 24px;
+    border: none; border-radius: 2px;
+    cursor: pointer; transition: all 0.2s;
+    display: inline-flex; align-items: center; gap: 8px;
+    outline: none;
+  }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .btn-primary {
+    background: var(--accent);
+    color: var(--bg-void);
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: #33dcff;
+    box-shadow: 0 0 32px var(--accent-glow);
+    transform: translateY(-1px);
+  }
+  .btn-primary:active:not(:disabled) { transform: translateY(0); }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--green);
+    border: 1px solid rgba(0,229,160,0.35);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--green-dim);
+    border-color: var(--green);
+    box-shadow: 0 0 16px rgba(0,229,160,0.2);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    font-size: 10px; padding: 6px 14px;
+  }
+  .btn-ghost:hover { border-color: var(--border-hi); color: var(--text-primary); }
+
+  /* ── Processing overlay ─────────────────────────────────────── */
+  #processing-overlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(8,12,16,0.85);
+    backdrop-filter: blur(4px);
+    align-items: center; justify-content: center;
+    flex-direction: column; gap: 20px;
+  }
+  #processing-overlay.active { display: flex; }
+
+  .spinner {
+    width: 48px; height: 48px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .processing-text {
+    font-family: var(--font-display);
+    font-size: 14px; font-weight: 600;
+    color: var(--text-primary); letter-spacing: 0.08em;
+  }
+  .processing-sub { font-size: 11px; color: var(--text-secondary); }
+
+  /* ── Data Tables ─────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto;
+    max-height: 420px;
+    overflow-y: auto;
+  }
+  table {
+    width: 100%; border-collapse: collapse;
+    font-size: 12px;
+  }
+  thead th {
+    font-family: var(--font-display);
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--text-secondary);
+    padding: 10px 14px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    position: sticky; top: 0; z-index: 2;
+    white-space: nowrap;
+  }
+  tbody tr {
+    border-bottom: 1px solid rgba(30,45,61,0.6);
+    transition: background 0.15s;
+  }
+  tbody tr:hover { background: var(--bg-elevated); }
+  tbody td {
+    padding: 9px 14px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Status Badges ───────────────────────────────────────────── */
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 8px; border-radius: 2px;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    font-family: var(--font-display);
+  }
+  .badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; }
+
+  .badge-new      { background: var(--blue-dim);   color: var(--blue);   border: 1px solid rgba(77,166,255,0.2); }
+  .badge-new::before      { background: var(--blue);   box-shadow: 0 0 4px var(--blue); }
+
+  .badge-fill     { background: var(--green-dim);  color: var(--green);  border: 1px solid rgba(0,229,160,0.2); }
+  .badge-fill::before     { background: var(--green);  box-shadow: 0 0 4px var(--green); }
+
+  .badge-pfill    { background: var(--yellow-dim); color: var(--yellow); border: 1px solid rgba(245,200,66,0.2); }
+  .badge-pfill::before    { background: var(--yellow); box-shadow: 0 0 4px var(--yellow); }
+
+  .badge-reject   { background: var(--red-dim);    color: var(--red);    border: 1px solid rgba(255,77,106,0.2); }
+  .badge-reject::before   { background: var(--red);    box-shadow: 0 0 4px var(--red); }
+
+  /* ── Side badge ─────────────────────────────────────────────── */
+  .side-buy  { color: var(--green); font-weight: 700; }
+  .side-sell { color: var(--red);   font-weight: 700; }
+
+  /* ── Stats bar ──────────────────────────────────────────────── */
+  .stat-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 14px 18px;
+    min-width: 120px;
+  }
+  .stat-label {
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--text-muted); margin-bottom: 4px;
+    font-family: var(--font-display);
+  }
+  .stat-value {
+    font-size: 22px; font-weight: 400;
+    color: var(--text-primary);
+    line-height: 1; font-variant-numeric: tabular-nums;
+  }
+  .stat-value.accent  { color: var(--accent); }
+  .stat-value.green   { color: var(--green); }
+  .stat-value.yellow  { color: var(--yellow); }
+  .stat-value.red     { color: var(--red); }
+
+  /* ── Empty state ─────────────────────────────────────────────── */
+  .empty-state {
+    padding: 48px 32px;
+    text-align: center;
+    color: var(--text-muted);
+  }
+  .empty-state-icon { font-size: 32px; margin-bottom: 12px; opacity: 0.4; }
+  .empty-state-text {
+    font-family: var(--font-display);
+    font-size: 13px; font-weight: 600; margin-bottom: 4px;
+    color: var(--text-secondary);
+  }
+  .empty-state-sub { font-size: 11px; }
+
+  /* ── Toast ───────────────────────────────────────────────────── */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px; z-index: 300;
+    padding: 12px 20px;
+    border-radius: 2px; border-left: 3px solid var(--accent);
+    background: var(--bg-elevated);
+    font-size: 12px; color: var(--text-primary);
+    opacity: 0; transform: translateY(8px);
+    transition: all 0.3s ease;
+    max-width: 360px; pointer-events: none;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.error { border-color: var(--red); }
+  #toast.success { border-color: var(--green); }
+
+  /* ── Ticker tape ─────────────────────────────────────────────── */
+  .ticker-wrap {
+    overflow: hidden; border-top: 1px solid var(--border);
+    background: var(--bg-surface); height: 28px;
+    display: flex; align-items: center;
+  }
+  .ticker-inner {
+    display: flex; gap: 48px;
+    animation: ticker 28s linear infinite;
+    white-space: nowrap; padding: 0 24px;
+  }
+  .ticker-item {
+    font-size: 10px; letter-spacing: 0.08em; color: var(--text-muted);
+    display: flex; gap: 8px;
+  }
+  .ticker-item strong { color: var(--text-secondary); font-weight: 400; }
+  .ticker-up   { color: var(--green); }
+  .ticker-down { color: var(--red); }
+
+  @keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+  /* ── Animations ─────────────────────────────────────────────── */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .fade-in { animation: fadeIn 0.4s ease forwards; }
+
+  @keyframes scanline {
+    0%   { top: -2px; }
+    100% { top: 100%; }
+  }
+
+  /* ── Engine log ─────────────────────────────────────────────── */
+  #engine-log {
+    font-family: var(--font-mono);
+    font-size: 11px; color: var(--text-secondary);
+    background: #05080b; border: 1px solid var(--border);
+    padding: 14px; border-radius: 2px;
+    max-height: 100px; overflow-y: auto;
+    white-space: pre-wrap; display: none;
+  }
+  #engine-log.active { display: block; }
+
+  /* ── Section header with line ───────────────────────────────── */
+  .section-eyebrow {
+    font-family: var(--font-display);
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--accent);
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 16px;
+  }
+  .section-eyebrow::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(90deg, var(--border-hi), transparent);
+  }
+</style>
+</head>
+
+<body>
+<div id="app">
+
+  <!-- ── Header ──────────────────────────────────────────────── -->
+  <header class="site-header">
+    <div class="logo">
+      <div class="logo-mark">&#x273F;</div>
+      <span class="logo-text">Flower<span class="logo-sub">Exchange</span></span>
+    </div>
+    <div class="header-status">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-label">CONNECTING...</span>
+    </div>
+    <div class="header-meta">
+      <span><strong id="hdr-time">--:--:--</strong></span>
+      <span>TRADER TERMINAL v2.1</span>
+      <span>LSEG · UOM</span>
+    </div>
+  </header>
+
+  <!-- ── Ticker tape ─────────────────────────────────────────── -->
+  <div class="ticker-wrap" aria-hidden="true">
+    <div class="ticker-inner" id="ticker">
+      <div class="ticker-item"><strong>ROSE</strong><span class="ticker-up">55.00 ▲2.1%</span></div>
+      <div class="ticker-item"><strong>LAVENDER</strong><span class="ticker-up">20.00 ▲0.5%</span></div>
+      <div class="ticker-item"><strong>LOTUS</strong><span class="ticker-down">15.00 ▼1.2%</span></div>
+      <div class="ticker-item"><strong>TULIP</strong><span class="ticker-up">35.00 ▲3.8%</span></div>
+      <div class="ticker-item"><strong>ORCHID</strong><span class="ticker-down">50.00 ▼0.7%</span></div>
+      <div class="ticker-item"><strong>ROSE</strong><span class="ticker-up">55.00 ▲2.1%</span></div>
+      <div class="ticker-item"><strong>LAVENDER</strong><span class="ticker-up">20.00 ▲0.5%</span></div>
+      <div class="ticker-item"><strong>LOTUS</strong><span class="ticker-down">15.00 ▼1.2%</span></div>
+      <div class="ticker-item"><strong>TULIP</strong><span class="ticker-up">35.00 ▲3.8%</span></div>
+      <div class="ticker-item"><strong>ORCHID</strong><span class="ticker-down">50.00 ▼0.7%</span></div>
+    </div>
+  </div>
+
+  <!-- ── Main layout ─────────────────────────────────────────── -->
+  <main style="padding: 28px 32px; max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px;">
+
+    <!-- Row 1: Upload + Stats -->
+    <div style="display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start;">
+
+      <!-- Upload Panel -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-dot"></div>
+          <span class="panel-title">Order Submission — Upload orders.csv</span>
+        </div>
+        <div style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+
+          <!-- Drop Zone -->
+          <div id="drop-zone" role="button" tabindex="0" aria-label="Upload orders CSV">
+            <div class="drop-icon">&#x2197;</div>
+            <div class="drop-label">Drop your orders.csv here</div>
+            <div class="drop-sub" style="margin-top: 4px;">or click to select a file &nbsp;·&nbsp; CSV only</div>
+            <input type="file" id="file-input" accept=".csv" style="display:none"/>
+          </div>
+
+          <!-- File badge -->
+          <div id="file-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span id="file-name">—</span>
+            <span style="margin-left: auto; opacity: 0.6; font-size: 10px;" id="file-size">—</span>
+            <button class="btn btn-ghost" onclick="clearFile()" style="margin-left: 8px; padding: 4px 10px;">✕</button>
+          </div>
+
+          <!-- Action buttons -->
+          <div style="display: flex; gap: 12px; align-items: center;">
+            <button class="btn btn-primary" id="submit-btn" disabled onclick="submitOrders()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Submit to Exchange
+            </button>
+            <button class="btn btn-secondary" id="download-btn" disabled onclick="downloadReport()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download Report
+            </button>
+          </div>
+
+          <!-- Engine log -->
+          <div id="engine-log"></div>
+
+        </div>
+      </div>
+
+      <!-- Stats Panel -->
+      <div class="panel" style="height: 100%;">
+        <div class="panel-header">
+          <div class="panel-dot" style="background: var(--green); box-shadow: 0 0 8px var(--green);"></div>
+          <span class="panel-title">Session Statistics</span>
+        </div>
+        <div style="padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="stat-card">
+              <div class="stat-label">Orders</div>
+              <div class="stat-value accent" id="stat-orders">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Reports</div>
+              <div class="stat-value" id="stat-reports">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Fills</div>
+              <div class="stat-value green" id="stat-fills">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">PFills</div>
+              <div class="stat-value yellow" id="stat-pfills">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Rejected</div>
+              <div class="stat-value red" id="stat-rejected">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Engine ms</div>
+              <div class="stat-value accent" id="stat-ms">—</div>
+            </div>
+          </div>
+          <div style="margin-top: 8px; padding: 10px; background: var(--bg-void); border: 1px solid var(--border); border-radius: 2px;">
+            <div class="stat-label" style="margin-bottom: 8px;">Instrument Breakdown</div>
+            <div id="instrument-breakdown" style="display: flex; flex-direction: column; gap: 5px;">
+              <div style="font-size: 10px; color: var(--text-muted);">No data yet</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Orders Table -->
+    <div class="panel" id="orders-panel">
+      <div class="panel-header" style="justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="panel-dot" style="background: var(--accent);"></div>
+          <span class="panel-title">Incoming Order Book</span>
+        </div>
+        <span style="font-size: 10px; color: var(--text-muted);" id="orders-count">— rows</span>
+      </div>
+      <div class="table-wrap" id="orders-table-wrap">
+        <div class="empty-state">
+          <div class="empty-state-icon">📋</div>
+          <div class="empty-state-text">No orders loaded</div>
+          <div class="empty-state-sub">Upload an orders.csv to preview the order book</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Execution Reports Table -->
+    <div class="panel" id="reports-panel">
+      <div class="panel-header" style="justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="panel-dot" style="background: var(--green); box-shadow: 0 0 8px var(--green);"></div>
+          <span class="panel-title">Execution Reports</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="font-size: 10px; color: var(--text-muted);" id="reports-count">— rows</span>
+          <div style="display: flex; gap: 8px; font-size: 10px; color: var(--text-muted);">
+            <span style="color:var(--blue)">■ New</span>
+            <span style="color:var(--green)">■ Fill</span>
+            <span style="color:var(--yellow)">■ PFill</span>
+            <span style="color:var(--red)">■ Reject</span>
+          </div>
+        </div>
+      </div>
+      <div class="table-wrap" id="reports-table-wrap">
+        <div class="empty-state">
+          <div class="empty-state-icon">⚡</div>
+          <div class="empty-state-text">Awaiting execution</div>
+          <div class="empty-state-sub">Submit orders to the exchange engine to see execution reports</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Processing Overlay -->
+<div id="processing-overlay">
+  <div class="spinner"></div>
+  <div class="processing-text">Routing to Exchange Engine...</div>
+  <div class="processing-sub" id="processing-sub">Executing C++ matching engine</div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- ── JavaScript ─────────────────────────────────────────────── -->
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════ */
+let selectedFile = null;
+let lastReportCSV = null;
+
+/* ═══════════════════════════════════════════════════════════════
+   CLOCK
+═══════════════════════════════════════════════════════════════ */
+function updateClock() {
+  const now = new Date();
+  document.getElementById('hdr-time').textContent =
+    now.toTimeString().slice(0, 8);
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+/* ═══════════════════════════════════════════════════════════════
+   SERVER STATUS CHECK
+═══════════════════════════════════════════════════════════════ */
+async function checkStatus() {
+  const dot   = document.getElementById('status-dot');
+  const label = document.getElementById('status-label');
+  try {
+    const res = await fetch('/api/status');
+    const data = await res.json();
+    if (data.binary_found) {
+      dot.className   = 'status-dot';
+      label.textContent = 'ENGINE ONLINE';
+    } else {
+      dot.className   = 'status-dot';
+      label.textContent = 'BINARY NOT FOUND';
+      dot.style.background = 'var(--yellow)';
+      dot.style.boxShadow  = '0 0 8px var(--yellow)';
+    }
+  } catch {
+    dot.className   = 'status-dot offline';
+    label.textContent = 'SERVER OFFLINE';
+  }
+}
+checkStatus();
+setInterval(checkStatus, 10000);
+
+/* ═══════════════════════════════════════════════════════════════
+   FILE SELECTION & DRAG/DROP
+═══════════════════════════════════════════════════════════════ */
+const dropZone  = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
+
+dropZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropZone.classList.add('drag-over');
+});
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) handleFile(fileInput.files[0]);
+});
+
+function handleFile(file) {
+  if (!file.name.toLowerCase().endsWith('.csv')) {
+    showToast('Only .csv files are accepted.', 'error');
+    return;
+  }
+  selectedFile = file;
+
+  // Show file badge
+  document.getElementById('file-badge').style.display = 'flex';
+  document.getElementById('file-name').textContent = file.name;
+  document.getElementById('file-size').textContent = formatBytes(file.size);
+
+  // Enable submit button
+  document.getElementById('submit-btn').disabled = false;
+
+  // Parse & render preview table
+  parseAndRenderOrders(file);
+  showToast(`Loaded ${file.name}`, 'success');
+}
+
+function clearFile() {
+  selectedFile = null;
+  fileInput.value = '';
+  document.getElementById('file-badge').style.display = 'none';
+  document.getElementById('submit-btn').disabled = true;
+  document.getElementById('orders-table-wrap').innerHTML = `
+    <div class="empty-state">
+      <div class="empty-state-icon">📋</div>
+      <div class="empty-state-text">No orders loaded</div>
+      <div class="empty-state-sub">Upload an orders.csv to preview the order book</div>
+    </div>`;
+  document.getElementById('orders-count').textContent = '— rows';
+  resetStats();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PARSE ORDERS.CSV → PREVIEW TABLE
+═══════════════════════════════════════════════════════════════ */
+function parseAndRenderOrders(file) {
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: result => {
+      const rows = result.data;
+      document.getElementById('orders-count').textContent = `${rows.length} rows`;
+      document.getElementById('stat-orders').textContent = rows.length;
+
+      if (!rows.length) {
+        document.getElementById('orders-table-wrap').innerHTML =
+          '<div class="empty-state"><div class="empty-state-text">File is empty or has no data rows.</div></div>';
+        return;
+      }
+
+      const headers = Object.keys(rows[0]);
+      let html = '<table><thead><tr>';
+      html += '<th>#</th>';
+      headers.forEach(h => { html += `<th>${escHtml(h)}</th>`; });
+      html += '</tr></thead><tbody>';
+
+      rows.forEach((row, i) => {
+        html += `<tr class="fade-in" style="animation-delay:${Math.min(i * 20, 400)}ms">`;
+        html += `<td style="color:var(--text-muted);font-size:10px;">${i + 1}</td>`;
+        headers.forEach(h => {
+          const val = row[h] ?? '';
+          if (h.toLowerCase() === 'side') {
+            const isBuy = val.trim() === '1';
+            html += `<td><span class="${isBuy ? 'side-buy' : 'side-sell'}">${isBuy ? '▲ BUY' : '▼ SELL'}</span></td>`;
+          } else if (h.toLowerCase() === 'price') {
+            html += `<td style="color:var(--accent);font-variant-numeric:tabular-nums;">${escHtml(val)}</td>`;
+          } else {
+            html += `<td>${escHtml(val)}</td>`;
+          }
+        });
+        html += '</tr>';
+      });
+
+      html += '</tbody></table>';
+      document.getElementById('orders-table-wrap').innerHTML = html;
+    },
+    error: err => showToast(`Parse error: ${err.message}`, 'error'),
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SUBMIT TO EXCHANGE
+═══════════════════════════════════════════════════════════════ */
+async function submitOrders() {
+  if (!selectedFile) return;
+
+  showProcessing(true);
+  document.getElementById('submit-btn').disabled = true;
+  document.getElementById('download-btn').disabled = true;
+
+  const formData = new FormData();
+  formData.append('orders_file', selectedFile);
+
+  try {
+    const res = await fetch('/api/process', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      showToast(data.error || 'Server error.', 'error');
+      showEngineLog(data.engine_log || '');
+      return;
+    }
+
+    // Update stats
+    updateStats(data);
+
+    // Render execution reports
+    renderReports(data.reports);
+
+    // Show engine log
+    showEngineLog(data.engine_log);
+
+    // Enable download
+    document.getElementById('download-btn').disabled = false;
+
+    showToast(`Processed ${data.orders.length} orders → ${data.reports.length} reports  |  ${data.elapsed_ms.toFixed(2)} ms`, 'success');
+
+  } catch (err) {
+    showToast(`Network error: ${err.message}`, 'error');
+  } finally {
+    showProcessing(false);
+    document.getElementById('submit-btn').disabled = false;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RENDER EXECUTION REPORTS TABLE
+═══════════════════════════════════════════════════════════════ */
+function renderReports(reports) {
+  if (!reports || !reports.length) {
+    document.getElementById('reports-table-wrap').innerHTML =
+      '<div class="empty-state"><div class="empty-state-text">No execution reports generated.</div></div>';
+    document.getElementById('reports-count').textContent = '0 rows';
+    return;
+  }
+
+  document.getElementById('reports-count').textContent = `${reports.length} rows`;
+
+  const headers = Object.keys(reports[0]);
+  let html = '<table><thead><tr><th>#</th>';
+  headers.forEach(h => { html += `<th>${escHtml(h)}</th>`; });
+  html += '</tr></thead><tbody>';
+
+  reports.forEach((row, i) => {
+    const status = (row['Exec Status'] || row['ExecStatus'] || '').trim().toLowerCase();
+    let rowAccent = '';
+    if      (status === 'fill')   rowAccent = 'style="border-left: 2px solid rgba(0,229,160,0.4);"';
+    else if (status === 'pfill')  rowAccent = 'style="border-left: 2px solid rgba(245,200,66,0.4);"';
+    else if (status === 'reject') rowAccent = 'style="border-left: 2px solid rgba(255,77,106,0.4);"';
+    else if (status === 'new')    rowAccent = 'style="border-left: 2px solid rgba(77,166,255,0.4);"';
+
+    html += `<tr class="fade-in" ${rowAccent} style="animation-delay:${Math.min(i * 15, 600)}ms">`;
+    html += `<td style="color:var(--text-muted);font-size:10px;">${i + 1}</td>`;
+
+    headers.forEach(h => {
+      const val = row[h] ?? '';
+      const key = h.toLowerCase().replace(/[\s_]/g, '');
+
+      if (key === 'execstatus' || h === 'Exec Status') {
+        html += `<td>${statusBadge(val.trim())}</td>`;
+      } else if (key === 'side') {
+        const isBuy = val.trim() === '1';
+        html += `<td><span class="${isBuy ? 'side-buy' : 'side-sell'}">${isBuy ? '▲ BUY' : '▼ SELL'}</span></td>`;
+      } else if (key === 'price') {
+        html += `<td style="color:var(--accent);font-variant-numeric:tabular-nums;">${escHtml(val)}</td>`;
+      } else if (key === 'quantity') {
+        html += `<td style="font-variant-numeric:tabular-nums;">${escHtml(val)}</td>`;
+      } else if (key === 'reason' && val) {
+        html += `<td style="color:var(--red);font-size:11px;">${escHtml(val)}</td>`;
+      } else if (key === 'transactiontime' || h === 'Transaction Time') {
+        html += `<td style="color:var(--text-muted);font-size:10px;">${escHtml(val)}</td>`;
+      } else {
+        html += `<td>${escHtml(val)}</td>`;
+      }
+    });
+
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('reports-table-wrap').innerHTML = html;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DOWNLOAD
+═══════════════════════════════════════════════════════════════ */
+function downloadReport() {
+  window.location.href = '/api/download';
+  showToast('Downloading execution_rep.csv...', 'success');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   STATISTICS
+═══════════════════════════════════════════════════════════════ */
+function updateStats(data) {
+  const reports = data.reports || [];
+  let fills = 0, pfills = 0, rejected = 0, news = 0;
+  const instrCount = {};
+
+  reports.forEach(r => {
+    const st = (r['Exec Status'] || '').trim().toLowerCase();
+    if      (st === 'fill')   fills++;
+    else if (st === 'pfill')  pfills++;
+    else if (st === 'reject') rejected++;
+    else if (st === 'new')    news++;
+
+    const instr = (r['Instrument'] || '').trim();
+    if (instr) instrCount[instr] = (instrCount[instr] || 0) + 1;
+  });
+
+  document.getElementById('stat-orders').textContent  = data.orders?.length ?? 0;
+  document.getElementById('stat-reports').textContent = reports.length;
+  document.getElementById('stat-fills').textContent   = fills;
+  document.getElementById('stat-pfills').textContent  = pfills;
+  document.getElementById('stat-rejected').textContent = rejected;
+  document.getElementById('stat-ms').textContent =
+    data.elapsed_ms ? data.elapsed_ms.toFixed(2) : '—';
+
+  // Instrument breakdown
+  const breakdown = document.getElementById('instrument-breakdown');
+  if (Object.keys(instrCount).length) {
+    const total = Object.values(instrCount).reduce((a, b) => a + b, 0);
+    breakdown.innerHTML = Object.entries(instrCount).map(([name, count]) => {
+      const pct = Math.round((count / total) * 100);
+      return `
+        <div style="display:flex;align-items:center;gap:8px;font-size:10px;">
+          <span style="color:var(--text-secondary);min-width:64px;">${name}</span>
+          <div style="flex:1;height:3px;background:var(--border);border-radius:1px;overflow:hidden;">
+            <div style="height:100%;width:${pct}%;background:var(--accent);border-radius:1px;"></div>
+          </div>
+          <span style="color:var(--text-muted);min-width:28px;text-align:right;">${count}</span>
+        </div>`;
+    }).join('');
+  } else {
+    breakdown.innerHTML = '<div style="font-size:10px;color:var(--text-muted);">No data</div>';
+  }
+}
+
+function resetStats() {
+  ['stat-orders','stat-reports','stat-fills','stat-pfills','stat-rejected'].forEach(id => {
+    document.getElementById(id).textContent = '0';
+  });
+  document.getElementById('stat-ms').textContent = '—';
+  document.getElementById('instrument-breakdown').innerHTML =
+    '<div style="font-size:10px;color:var(--text-muted);">No data yet</div>';
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ENGINE LOG
+═══════════════════════════════════════════════════════════════ */
+function showEngineLog(text) {
+  const el = document.getElementById('engine-log');
+  if (text) {
+    el.textContent = text;
+    el.classList.add('active');
+  } else {
+    el.classList.remove('active');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════════════════ */
+function statusBadge(status) {
+  const s = status.toLowerCase();
+  if (s === 'fill')   return `<span class="badge badge-fill">Fill</span>`;
+  if (s === 'pfill')  return `<span class="badge badge-pfill">PFill</span>`;
+  if (s === 'reject') return `<span class="badge badge-reject">Reject</span>`;
+  if (s === 'new')    return `<span class="badge badge-new">New</span>`;
+  return `<span class="badge">${escHtml(status)}</span>`;
+}
+
+function escHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes/1024).toFixed(1)} KB`;
+  return `${(bytes/1024/1024).toFixed(1)} MB`;
+}
+
+function showProcessing(on) {
+  document.getElementById('processing-overlay').classList.toggle('active', on);
+}
+
+let toastTimer = null;
+function showToast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `show ${type}`;
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 4000);
+}
+</script>
+</body>
+</html>
